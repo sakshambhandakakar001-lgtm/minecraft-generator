@@ -1,0 +1,49 @@
+name: Render Minecraft Video
+
+on:
+  workflow_dispatch:
+
+jobs:
+  render:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v3
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
+
+    - name: Install Cloud Tools
+      run: |
+        pip install google-genai
+        npm install playwright
+        npx playwright install chromium --with-deps
+
+    - name: Generate HTML via AI
+      env:
+        GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      run: python generate.py
+
+    - name: Render HTML to MP4 Video
+      run: |
+        node -e "
+        const { chromium } = require('playwright');
+        const path = require('path');
+        (async () => {
+          const browser = await chromium.launch();
+          const page = await browser.newPage({ viewport: { width: 1080, height: 1920 } });
+          await page.goto('file://' + path.resolve('animation.html'));
+          await page.video({ path: 'output_video.mp4' });
+          await page.waitForTimeout(10000); // 10 Sec Video Recording
+          await browser.close();
+        })();
+        "
+
+    - name: Save MP4 Video Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: minecraft-shorts-video
+        path: output_video.mp4
